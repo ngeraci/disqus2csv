@@ -103,8 +103,14 @@ def to_dataframe(posts, infile):
     for ark in raw_dataframe['ARK']:
         urls.append('https://calisphere.org/item/' + ark)
     raw_dataframe['URL'] = pd.Series(urls).values
-    dataframe = raw_dataframe[['Image Title', 'URL', 'ARK', 'Message', 'Name', 'Username',
-                               'Email', 'CreatedAt']]
+    try:
+        dataframe = raw_dataframe[['Name', 'Username', 'Email', 'CreatedAt',  'Message',
+                                   'Image Title', 'URL', 'ARK']]
+    except KeyError:
+        # "email" not in export schema as of 2018-09
+        dataframe = raw_dataframe[['Name', 'Username', 'CreatedAt', 'Message',
+                                   'Image Title', 'URL', 'ARK']]
+
     dataframe = dataframe.rename(index=str,
                                  columns={'CreatedAt':'Comment Date', 'Message':'Comment'})
 
