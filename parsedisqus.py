@@ -1,86 +1,121 @@
+""" Command-line tool to convert Disqus comments export (custom XML format) to CSV.
+More info on Disqus XML format: https://help.disqus.com/developer/custom-xml-import-format
+"""
 import re
-from lxml import etree
-import pandas as pd
 import argparse
-import sys
+import pandas as pd
+from lxml import etree
 
 def main(args=None):
-	parser = argparse.ArgumentParser(
-		description='Disqus XML to CSV')
-	parser.add_argument(
-		'path', 
-		nargs=1, 
-		help='path to Disqus XML file',
-		type=str)
-	if args is None:
-		args = parser.parse_args()
+    """Parse command line args.
+    """
+    parser = argparse.ArgumentParser(
+        description='Disqus XML to CSV')
+    parser.add_argument(
+        'path',
+        nargs=1,
+        help='path to Disqus XML file',
+        type=str)
+    if args is None:
+        args = parser.parse_args()
 
-	disqus2csv(args.path[0])
-
-def tagParse(tag):
-	return tag[19].upper() + tag[20:]
+    disqus2csv(args.path[0])
 
 def disqus2csv(infile):
-	disqusXML = etree.parse(infile)
-	disqusRoot = disqusXML.getroot()
-	threads = {}
-	posts = []
-	# regular expression to match an ARK
-	arkRE = re.compile(r'(ark:/\d{5}\/[^/|\s]*)')
-	titleRE = re.compile(r'Image\s*\/\s(.*)')
-	titleRE2 = re.compile(r'Calisphere:\s*(.*)')
+    """Parse XML, match individual posts to thread info, create pandas dataframe, write to CSV.
+    """
+    disqus_xml = etree.parse(infile)
+    disqus_root = disqus_xml.getroot()
 
-	#gather thread elements in a dict with Thread ID as key
-	for element in disqusRoot.iterchildren():
-		if element.tag == '{http://disqus.com}thread':
-			threadID = element.attrib['{http://disqus.com/disqus-internals}id']
-			for child in element.getchildren():
-				if child.tag == "{http://disqus.com}link":
-					ark = arkRE.search(child.text).group(1)
-				if child.tag == "{http://disqus.com}title":
-					try:
-						title = titleRE.search(child.text).group(1)
-					except:
-						title = titleRE2.search(child.text).group(1)
+    threads = get_threads(disqus_root)
+    posts = get_posts(disqus_root)
+    posts = match_threads_posts(threads, posts)
 
-			threads[threadID] = [ark, title]
+    to_dataframe(posts, infile)
 
-	#gather post elements in a list
-	for element in disqusRoot.iterchildren():
-		if element.tag == '{http://disqus.com}post':
-			post = {}
-			post['Post ID'] = element.attrib['{http://disqus.com/disqus-internals}id']
-			for child in element.getchildren():
-				if child.text is not '\n            ' and child.text is not None:
-					if child.getchildren():
-						for grandchild in child.getchildren():
-							if grandchild.text is not None:
-								fieldName = tagParse(grandchild.tag)
-								post[fieldName] = grandchild.text
-					else:
-						fieldName = tagParse(child.tag)
-						post[fieldName] = re.sub('<[^<]+?>', '', child.text) #strip <p> tags from "Message"
-				elif child.tag == '{http://disqus.com}thread':
-					post['Thread ID'] = child.attrib['{http://disqus.com/disqus-internals}id']
-			posts.append(post)
+def get_threads(disqus_root):
+    """Return dict of thread elements with Thread ID as key
+    """
+    threads = {}
 
-	#match posts to threads on Thread ID
-	for post in posts:
-		post['ARK'] = threads[post['Thread ID']][0]
-		post['Image Title'] = threads[post['Thread ID']][1]
+    ark_re = re.compile(r'(ark:/\d{5}\/[^/|\s]*)')
+    title_re = re.compile(r'Image\s*\/\s(.*)')
+    title_re2 = re.compile(r'Calisphere:\s*(.*)')
 
-	#convert to pandas dataframe, generate URL from ARK, set column order and labels
-	rawDF = pd.DataFrame.from_dict(posts)
-	urls = []
-	for ark in rawDF['ARK']:
-		urls.append('https://calisphere.org/item/' + ark)
-	rawDF['URL'] = pd.Series(urls).values
-	df = rawDF[['Image Title', 'URL', 'ARK', 'Message', 'Name', 'Username', 'Email', 'CreatedAt']]
-	df = df.rename(index=str, columns = {'CreatedAt':'Comment Date', 'Message':'Comment'})
+    for element in disqus_root.iterchildren():
+        if element.tag == '{http://disqus.com}thread':
+            thread_id = element.attrib['{http://disqus.com/disqus-internals}id']
+            for child in element.getchildren():
+                if child.tag == "{http://disqus.com}link":
+                    ark = ark_re.search(child.text).group(1)
+                if child.tag == "{http://disqus.com}title":
+                    try:
+                        title = title_re.search(child.text).group(1)
+                    except AttributeError:
+                        title = title_re2.search(child.text).group(1)
 
-	outfile = infile.replace('.xml','.csv')
-	df.to_csv(outfile, index=False)
+            threads[thread_id] = [ark, title]
 
-# main() idiom
+    return threads
+
+def get_posts(disqus_root):
+    """Return list of post elements.
+    """
+    posts = []
+
+
+
+    for element in disqus_root.iterchildren():
+        post_object = element.xpath('{http://disqus.com}post')
+        post = {'Post ID': post_object.attrib['{http://disqus.com/disqus-internals}id']}
+
+        for child in post_object.getchildren():
+            if child.text.strip() != '\n' and child.text is not None and child.getchildren():
+                for grandchild in child.getchildren():
+                    if grandchild.text is not None:
+                        field_name = tag_to_fieldname(grandchild.tag)
+                        post[field_name] = grandchild.text
+                    else:
+                        field_name = tag_to_fieldname(child.tag)
+                        #strip <p> tags from "Message"
+                        post[field_name] = re.sub('<[^<]+?>', '', child.text)
+            elif child.tag == '{http://disqus.com}thread':
+                post['Thread ID'] = child.attrib['{http://disqus.com/disqus-internals}id']
+        posts.append(post)
+
+    return posts
+
+def match_threads_posts(threads, posts):
+    """Match posts to threads on Thread ID. Return updated posts list.
+    """
+    for post in posts:
+        post['ARK'] = threads[post['Thread ID']][0]
+        post['Image Title'] = threads[post['Thread ID']][1]
+
+    return posts
+
+
+def to_dataframe(posts, infile):
+    """Convert to pandas dataframe, generate URL from ARK, set column order and labels.
+    Write out csv.
+    """
+    raw_dataframe = pd.DataFrame.from_dict(posts)
+    urls = []
+    for ark in raw_dataframe['ARK']:
+        urls.append('https://calisphere.org/item/' + ark)
+    raw_dataframe['URL'] = pd.Series(urls).values
+    dataframe = raw_dataframe[['Image Title', 'URL', 'ARK', 'Message', 'Name', 'Username',
+                               'Email', 'CreatedAt']]
+    dataframe = dataframe.rename(index=str,
+                                 columns={'CreatedAt':'Comment Date', 'Message':'Comment'})
+
+    outfile = infile.replace('.xml', '.csv')
+    dataframe.to_csv(outfile, index=False)
+
+def tag_to_fieldname(tag):
+    """Get CSV fieldname from XML tag.
+    """
+    return tag[19].upper() + tag[20:]
+
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
