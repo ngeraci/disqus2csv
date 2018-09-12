@@ -39,10 +39,10 @@ def get_threads(disqus_root):
     threads = {}
 
     ark_re = re.compile(r'(ark:/\d{5}\/[^/|\s]*)')
-    title_re = re.compile(r'Image\s*\/\s(.*)')
-    title_re2 = re.compile(r'Calisphere:\s*(.*)')
+    title_re = re.compile(r'Image\s*\/\s(.*)', flags=re.DOTALL)
+    title_re2 = re.compile(r'Calisphere:\s*(.*)', flags=re.DOTALL)
 
-    for element in disqus_root.iterchildren():
+    for element in disqus_root.findall('{http://disqus.com}thread'):
         if element.tag == '{http://disqus.com}thread':
             thread_id = element.attrib['{http://disqus.com/disqus-internals}id']
             for child in element.getchildren():
@@ -53,6 +53,8 @@ def get_threads(disqus_root):
                         title = title_re.search(child.text).group(1)
                     except AttributeError:
                         title = title_re2.search(child.text).group(1)
+                    # collapse multiple whitespace
+                    title = ' '.join(title.split())
 
             threads[thread_id] = [ark, title]
 
@@ -62,23 +64,20 @@ def get_posts(disqus_root):
     """Return list of post elements.
     """
     posts = []
+    for element in disqus_root.findall('{http://disqus.com}post'):
+        post = {'Post ID': element.attrib['{http://disqus.com/disqus-internals}id']}
 
-
-
-    for element in disqus_root.iterchildren():
-        post_object = element.xpath('{http://disqus.com}post')
-        post = {'Post ID': post_object.attrib['{http://disqus.com/disqus-internals}id']}
-
-        for child in post_object.getchildren():
-            if child.text.strip() != '\n' and child.text is not None and child.getchildren():
-                for grandchild in child.getchildren():
-                    if grandchild.text is not None:
-                        field_name = tag_to_fieldname(grandchild.tag)
-                        post[field_name] = grandchild.text
-                    else:
-                        field_name = tag_to_fieldname(child.tag)
-                        #strip <p> tags from "Message"
-                        post[field_name] = re.sub('<[^<]+?>', '', child.text)
+        for child in element.getchildren():
+            if child.text and child.text.strip() != '\n':
+                if child.getchildren():
+                    for grandchild in child.getchildren():
+                        if grandchild.text is not None:
+                            field_name = tag_to_fieldname(grandchild.tag)
+                            post[field_name] = grandchild.text
+                else:
+                    field_name = tag_to_fieldname(child.tag)
+                    #strip <p> tags from "Message"
+                    post[field_name] = re.sub('<[^<]+?>', '', child.text)
             elif child.tag == '{http://disqus.com}thread':
                 post['Thread ID'] = child.attrib['{http://disqus.com/disqus-internals}id']
         posts.append(post)
