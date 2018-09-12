@@ -1,14 +1,15 @@
-"""Extract comments by single username to CSV.
+"""Extract comments from single username to CSV.
 """
+import sys
 import argparse
 import pandas as pd
-from parsedisqus import *
+from disqus_to_csv import *
 
 def main(args=None):
     """Parse command line args.
     """
     parser = argparse.ArgumentParser(
-        description='Disqus XML to CSV, filtered by username')
+        description='Disqus XML to CSV, filtered on a single username')
     parser.add_argument(
         'path',
         nargs=1,
@@ -17,7 +18,7 @@ def main(args=None):
     parser.add_argument(
         'username',
         nargs=1,
-        help='username to get comments from',
+        help='username to filter on',
         type=str)
     parser.add_argument(
         'outfile',

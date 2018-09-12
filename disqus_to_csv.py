@@ -2,6 +2,7 @@
 More info on Disqus XML format: https://help.disqus.com/developer/custom-xml-import-format
 """
 import re
+import sys
 import argparse
 import pandas as pd
 from lxml import etree
@@ -16,8 +17,11 @@ def main(args=None):
         nargs=1,
         help='path to Disqus XML file',
         type=str)
-    if args is None:
-        args = parser.parse_args()
+    parser.add_argument(
+        'output',
+        nargs='?',
+        help="""optional path to CSV output file. Default is to use basename of
+                XML file with .csv extension""")
 
     # print help if no args given
     if len(sys.argv) == 1:
