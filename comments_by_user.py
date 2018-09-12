@@ -24,6 +24,13 @@ def main(args=None):
         nargs=1,
         help='path to output file',
         type=str)
+
+    # print help if no args given
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+
+    # parse
     if args is None:
         args = parser.parse_args()
 

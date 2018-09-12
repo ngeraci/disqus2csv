@@ -19,6 +19,15 @@ def main(args=None):
     if args is None:
         args = parser.parse_args()
 
+    # print help if no args given
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+
+    # parse
+    if args is None:
+        args = parser.parse_args()
+
     dataframe = disqus2df(args.path[0])
 
     write_out(dataframe, args.path[0])
