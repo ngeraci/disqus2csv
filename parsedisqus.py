@@ -19,10 +19,12 @@ def main(args=None):
     if args is None:
         args = parser.parse_args()
 
-    disqus2csv(args.path[0])
+    dataframe = disqus2df(args.path[0])
 
-def disqus2csv(infile):
-    """Parse XML, match individual posts to thread info, create pandas dataframe, write to CSV.
+    write_out(dataframe, args.path[0])
+
+def disqus2df(infile):
+    """Parse XML, match individual posts to thread info, return pandas dataframe.
     """
     disqus_xml = etree.parse(infile)
     disqus_root = disqus_xml.getroot()
@@ -30,8 +32,9 @@ def disqus2csv(infile):
     threads = get_threads(disqus_root)
     posts = get_posts(disqus_root)
     posts = match_threads_posts(threads, posts)
+    dataframe = to_dataframe(posts)
 
-    to_dataframe(posts, infile)
+    return dataframe
 
 def get_threads(disqus_root):
     """Return dict of thread elements with Thread ID as key
@@ -93,10 +96,9 @@ def match_threads_posts(threads, posts):
 
     return posts
 
-
-def to_dataframe(posts, infile):
+def to_dataframe(posts):
     """Convert to pandas dataframe, generate URL from ARK, set column order and labels.
-    Write out csv.
+    Return dataframe.
     """
     raw_dataframe = pd.DataFrame.from_dict(posts)
     urls = []
@@ -114,6 +116,11 @@ def to_dataframe(posts, infile):
     dataframe = dataframe.rename(index=str,
                                  columns={'CreatedAt':'Comment Date', 'Message':'Comment'})
 
+    return dataframe
+
+def write_out(dataframe, infile):
+    """write dataframe to csv.
+    """
     outfile = infile.replace('.xml', '.csv')
     dataframe.to_csv(outfile, index=False)
 
