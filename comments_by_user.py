@@ -1,4 +1,4 @@
-"""extract comments by single username
+"""Extract comments by single username to CSV.
 """
 import argparse
 import pandas as pd
