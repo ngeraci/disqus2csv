@@ -1,8 +1,10 @@
-# Disqus to CSV
+# Calisphere Disqus to CSV
 
 Transform an XML file [exported from Disqus](https://help.disqus.com/developer/comments-export) to CSV.
 
-Currently, this is written specifically for working with Disqus comments on images in Calisphere. It needs some more untangling to be truly generalizable.
+Currently, this is written specifically for working with Disqus comments from Calisphere. It needs some more untangling to be truly generalizable.
+
+Requires: pandas, lxml
 
 **disqus_to_csv.py** is the main function.
 ```

@@ -105,7 +105,7 @@ def match_threads_posts(threads, posts):
     """
     for post in posts:
         post['ARK'] = threads[post['Thread ID']][0]
-        post['Image Title'] = threads[post['Thread ID']][1]
+        post['Item Title'] = threads[post['Thread ID']][1]
 
     return posts
 
@@ -120,11 +120,11 @@ def to_dataframe(posts):
     raw_dataframe['URL'] = pd.Series(urls).values
     try:
         dataframe = raw_dataframe[['Name', 'Username', 'Email', 'CreatedAt',  'Message',
-                                   'Image Title', 'URL', 'ARK']]
+                                   'Item Title', 'URL', 'ARK']]
     except KeyError:
         # "email" not in export schema as of 2018-09
         dataframe = raw_dataframe[['Name', 'Username', 'CreatedAt', 'Message',
-                                   'Image Title', 'URL', 'ARK']]
+                                   'Item Title', 'URL', 'ARK']]
 
     dataframe = dataframe.rename(index=str,
                                  columns={'CreatedAt':'Comment Date', 'Message':'Comment'})
